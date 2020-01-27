@@ -1,0 +1,229 @@
+---
+title: "Assignment1 Ques 1 STAT 841"
+author: "Rudrani Bhadra"
+output: pdf_document
+---
+#Question 1:
+
+##(a)
+```{r}
+set.seed(67982193)
+wheat <- read.csv("/Users/rudranibhadra/Downloads/wheat.csv")
+perm<-sample(x=nrow(wheat))
+set1<-wheat[which(perm<=200),-1]
+set2<-wheat[which(perm>200),-1]
+wheat$classnum<-as.numeric(wheat$class)
+```
+
+## Print out head(set1) and head(set2):
+```{r} 
+print(head(set1))
+print(head(set2))
+```
+##(b) Make a scatterplot matrix of the data :
+
+```{r}
+#Q1b:
+my_cols <- c("red", "green", "blue")
+# Correlation panel
+panel.cor <- function(x, y){
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  r <- round(cor(x, y), digits=2)
+  txt <- paste0("R = ", r)
+  cex.cor <- 0.8/strwidth(txt)
+  text(0.5, 0.5, txt, cex = 1.5)
+}
+
+# Customize upper panel
+upper.panel<-function(x, y){
+  points(x,y, pch = 19, col = my_cols[set1$type])
+}
+
+# Create the plots
+pairs(set1[,1:6],
+      lower.panel = panel.cor,
+      upper.panel = upper.panel)
+```
+
+#Describe what you see with respect to 
+### (i) potential to predict type: 
+From the above scatter plot, there is very less potential to predict type. The 'type' cannot be determined as the data points are overlapping and it is difficult to distinguish between the 'types'-Healthy, Sprout and Scab. The data points are scattered and are not clustered which makes it difficult to predict type.
+
+### (ii) potential for dimension reduction:
+From the above scatter plot, there is less potential to predict dimension reduction. 
+
+##(c) Run a principal components analysis on the training data (set1)
+```{r}
+set1$classnum<-as.numeric(set1$class)
+head(set1$classnum)
+PCA<-prcomp(set1[,c(2,3,4,5,6,8)],scale=TRUE)
+summary(PCA)
+```
+
+##Describe the results. In particular, how many components do you think would be a good summary of the data?
+A principal component is a normalized linear version of the features. From the above figure, it can be seen that we have 6 principle componenets. PC1 has the highest the proportion of variance - 34% .It goes on decreasing for other Principal Components. PC1 and PC2 are the only important PCA as they capture 64% of the variance. PC5 and PC6 are the least significant PCs. So the explanatory variables -moisture and classnum can be easily removed from future models. Density, hardness, size and weight are significant features as they have 92% proportion of variance.
+
+##(d) Run a linear discriminant analysis on the response, type. You will need to use the numerical version of class.
+
+```{r}
+#LDA:
+library(MASS)
+lda.fit <- lda(x=set1[,-c(1,7)], grouping=set1$type)
+lda.fit
+```
+
+
+##(d)i./ Compare the class means for each variable.
+1. Density:
+For Density, the mean for Healthy, Scab and Sprout are 1.28, 1.07 and 1.19 respectively. Healthy has the highest mean and Scab has the lowest mean. the three means are very close to each other.
+2. Hardness:
+For Hardness, the mean for Healthy, Scab and Sprout are 27.71, 28.88 and 16.74 respectively. Scab has the highest mean and Sprout has the lowest mean. The means of Healthy and Scab are similar to each other
+3. Size:
+For Size, the mean for Healthy, Scab and Sprout are 2.33, 1.86 and 2.36 respectively. Sprout has the highest mean and Scab has the lowest mean. The means of Healthy and Sprout are similar to each other.
+4. Weight:
+For Weight, the mean for Healthy, Scab and Sprout are 30.27, 20.15 and 30.95 respectively. Sprout has the highest mean and Scab has the lowest mean. The means of Healthy and Sprout are very similar to each other.
+5.Moisture:
+For Moisture, the mean for Healthy, Scab and Sprout are 11.53, 11.06 and 11.04 respectively. Healthy has the highest mean and Scab has the lowest mean. All three means are very similar to one another.
+6. Classnum:
+For Classnum, the mean for Healthy, Scab and Sprout are 1.52, 1.44 and 1.48 respectively. Healthy has the highest mean and Scab has the lowest mean. All three means are very close to one another.
+##(d)ii./Plot the results;
+```{r}
+par("mar")
+par(mar=c(1,1,1,1))
+plot(lda.fit, dimen=1, type="histogram")
+```
+
+##How well does the classifier work?
+The plot above shows how the response variable is classified by the LDA. From the above figure we can see that the X axis is the line value defined ny the coefficient of linear discriminant for the LDA model. The three groups are shown in the histogram for the response classes.
+##(iii)./Report the training error and test error.
+``` {r}
+##Predicting training results.
+lda.pred.train<-predict(lda.fit,newdata=set1[,-c(1,7)])$class
+(lmisclass.train <- mean(ifelse(lda.pred.train == set1$type, yes=0, no=1)))
+#lmisclass.train
+#ldafit.train.lda
+
+##Predicting test results.
+set2$classnum<-as.numeric(set2$class)
+
+lda.pred.test<-predict(lda.fit,newdata=set2[,-c(1,7)])$class
+(lmisclass.test <- mean(ifelse(lda.pred.test == set2$type, yes=0, no=1)))
+#lmisclass.test
+#ldafit.test.lda
+```
+
+##(iv)./Show the “confusion matrix” for the test set and interpret the nature of the misclassifications.
+``` {r}
+table(set2$type, lda.pred.test, dnn=c("Obs","Pred"))
+```
+
+From the confusion matrix, we can see that 16 Healthy types are predicted correctly. 2 and 7 Healthy types are wrongly interpreted as Scab and Sprout by the classifier. 
+15 Scab types are correctly predicted and 5 and 2 Scab types are incorrectly predicted as Healthy and Sprout.
+15 Sprout types are correctly predicted. 7 and 6 Sprout types are not predicted correctly by the classifier.
+##(e) Run a quadratic discriminant analysis.
+
+```{r}
+## QDA:
+library(MASS)
+qda.fit <- qda(x=set1[,-c(1,7)], grouping=set1$type)
+qda.fit
+```
+
+##(e)i./Report the training error and test error and compare to previous results
+```{r}
+qda.pred.train <- predict(qda.fit, newdata=set1[-c(1,7)])$class
+qda.pred.test <- predict(qda.fit, newdata=set2[-c(1,7)])$class
+(qmisclass.train <- mean(ifelse(qda.pred.train == set1$type, yes=0, no=1)))
+(qmisclass.test <- mean(ifelse(qda.pred.test == set2$type, yes=0, no=1)))
+```
+The training error of QDA classifier is lower than the LDA classififer. The testing error of the QDA is higher than the LDA.
+##(e)ii./Repeat the analysis of the confusion matrix.
+
+```{r}
+# Test set confusion matrix
+table(set2$type, qda.pred.test, dnn=c("Obs","Pred"))
+```
+From the confusion matrix, we can see that 14 Healthy types are predicted correctly. 11 Healthy types are wrongly interpreted as Sprout by the classifier. 
+14 Scab types are correctly predicted and 6 and 2 Scab types are incorrectly predicted as Healthy and Sprout.
+15 Sprout types are correctly predicted. 8 and 5 Sprout types are not predicted correctly by the classifier.
+##(f)Run a logistic regression using multinom()
+
+```{r}
+## Multinomial
+rescale <- function(x1,x2){
+  for(col in 1:ncol(x1)){
+    a <- min(x2[,col])
+    b <- max(x2[,col])
+    x1[,col] <- (x1[,col]-a)/(b-a)
+  }
+  x1
+}
+
+set1.rescale <- data.frame(cbind(rescale(set1[,-c(1,7)], set1[,-c(1,7)]), type=set1$type))
+set2.rescale <- data.frame(cbind(rescale(set2[,-c(1,7)], set1[,-c(1,7)]), type=set2$type))
+
+library(nnet)
+mod.fit <- multinom(data=set1.rescale, formula=type~density+hardness+size+weight+moisture+classnum, trace=TRUE)
+summary(mod.fit)
+```
+##(f)i./ Report the equation for the probability estimate.
+```{r}
+
+
+
+```
+
+## Compare the coefficients’ signs in the linear predictor for scab to the signs in the first linear discriminant. Why would they be similar (what is the first linear discriminant doing)?
+
+##(f)ii./ Report likelihood ratio tests for all features. Interpret the results; especially, does there appear to be some reduction that could be a better (more sparse) model?
+``` {r}
+library(car)
+Anova(mod.fit)
+```
+The number of stars indicate how significant a variable is. So from the above figure it can be seen that density and weight are the most significant variables followed by hardness. Since the others are not signficant as explanatory variables, they can be removed and only density, weight and hardness can be kept.
+##(f)iii./Plot the data for the two most significant variables, with different symbols or colours for the observed classes.
+``` {r}
+#set1$classnum<-as.numeric(set1$class)
+dev.new(h=7,w=6,pointsize=12)
+type.col <- ifelse(set1$type=="Healthy",y=53,n=
+                      ifelse(set1$type=="Sprout",y=68,n=
+                               ifelse(set1$type=="Scab",y=203,n=464)))
+plot(x=set1[,2], y=set1[,5], col=colors()[type.col])
+```
+
+## How well does the classifier seem to work?
+It is not a good classifier as the different groups are not distinct in the plot. The points are all overlapping each other instead of forming distinct clusters.
+
+##(f)iv./Report the training error and test error and compare to previous results.
+
+```{r}
+# Misclassification Errors
+pred.class.1 <- predict(mod.fit, newdata=set1.rescale)
+pred.prob.1 <- round(predict(mod.fit, newdata=set1.rescale, type="probs"), digits=3)
+
+pred.class.2 <- predict(mod.fit, newdata=set2.rescale)
+pred.prob.2 <- predict(mod.fit, newdata=set2.rescale, type="probs")
+
+cbind(head(round(pred.prob.2, 2)), head(pred.class.2))
+
+(mul.misclass.train <- mean(ifelse(pred.class.1 == set1.rescale$type, yes=0, no=1)))
+(mul.misclass.test <- mean(ifelse(pred.class.2 == set2.rescale$type, yes=0, no=1)))
+```
+The training error of logistic regression is higher than the QDA classififer and same as LDA. The testing error of the logistic regression is lower than both the LDA and the QDA classifier.
+##(f)v./ Repeat the analysis of the confusion matrix.
+
+``` {r}
+table(set2$type, pred.class.2, dnn=c("Obs","Pred"))
+```
+From the confusion matrix, we can see that 16 Healthy types are predicted correctly. 4 and 5 Healthy types are wrongly interpreted as Scab and Sprout by the classifier. 
+14 Scab types are correctly predicted and 4 and 4 Scab types are incorrectly predicted as Healthy and Sprout.
+15 Sprout types are correctly predicted. 7 and 6 Sprout types are not predicted correctly by the classifier.
+``` {r}
+#set1$classnum<-as.numeric(set1$class)
+dev.new(h=7,w=6,pointsize=12)
+type.col <- ifelse(set1$type=="Healthy",y=53,n=
+                      ifelse(set1$type=="Sprout",y=68,n=
+                               ifelse(set1$type=="Scab",y=203,n=464)))
+plot(x=set1[,2], y=set1[,5], col=colors()[type.col])
+```

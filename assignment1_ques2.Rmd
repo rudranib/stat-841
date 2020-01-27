@@ -1,0 +1,141 @@
+---
+title: "Assignment1_STAT841"
+author: "Rudrani Bhadra"
+output: pdf_document
+---
+#Question 1:
+
+## (a) Before you do any splitting, run LDA on the full data set and make the default plot using the following colour scheme:
+
+```{r}
+set1 <- read.csv("/Users/rudranibhadra/Downloads/phoneme.csv")
+library(MASS)
+r<-lda(x=set1[,-c(1,258,259)],grouping=set1$g)
+class.col <- ifelse(set1$g=="sh",y=393, n=
+                      ifelse(set1$g=="iy",y=68, n=
+                               ifelse(set1$g=="dcl",y=203,n=
+                                      ifelse(set1$g=="aa",y=385,n=464))))
+plot(r, col=class.col)
+```
+
+## i. This will be a very interesting plot. Use it to interpret what each of the four discriminant functions is contributing to the classification. How does each discriminant help to separate the groups?
+Frokm the above plot it can be seen that LD1 does a good job at classifying 2 clusters from the other 3 in a very clear way. When combined with LD1, even LD2, LD3 and LD4 classify the clusters neatly and seperately.
+LD2 also performs well. LD3 sometimes combines 2 clusters but still manages to seperate the green and blue clusters. LD4 has too much overlapping of the clusters and its hard to distinguish then from each other.
+
+## ii. Print out a confusion matrix and relate it to the plot you made. Given the nature of the variable we are classifying (five pronounced sounds), does the pattern of misclassification make sense? You can also embed plots, for example:
+
+```{r}
+lda.pred <- predict(r, newdata=set1[,-c(1,258,259)])$class
+ldatrainp<- mean(ifelse(lda.pred==set1$g, yes = 0, no = 1))
+#lda.pred
+#ldatrainp
+table(set1$g, lda.pred, dnn = c("obs", "Pred"))
+#confusionmatrix
+```
+
+As we can see from the figure above, phonetic sounds which sound similar have been classififed incorrectly by the classifier. Sounds which sound different have not been misclassififed by the classifier. 
+#Question 2:
+
+```{r}
+lda_train_misclass <- c()
+qda_train_misclass <- c()
+lr_train_misclass <- c()
+lo_train_misclass <- c()
+ls_train_misclass <- c()
+
+lda_test_misclass <- c()
+qda_test_misclass <- c()
+lr_test_misclass <- c()
+lo_test_misclass <- c()
+ls_test_misclass <- c()
+
+for(i in 1:4){
+  minim = 1.0
+  
+  sample_data = sample(1:4509,4509,replace=TRUE)
+  sample_train = set1[sample_data,]
+  sample_test = set1[-sample_data,]
+  
+  # LDA
+  
+  lda.fit <- lda(x = sample_train[,-c(1,258,259)],grouping = sample_train$g)
+
+  pred_lda.train <- predict(lda.fit, newdata=sample_train[,-c(1,258,259)])$class
+  pred_lda.test <- predict(lda.fit, newdata=sample_test[,-c(1,258,259)])$class
+
+  lda_train_misclass[i] <- mean(ifelse(pred_lda.train == sample_train[,c(258)], yes=0, no=1))
+  lda_test_misclass[i] <- mean(ifelse(pred_lda.test == sample_test[,c(258)], yes=0, no=1))
+  if(lda_test_misclass[i]<minim){
+    minim = lda_test_misclass[i]
+  }
+  
+  # QDA
+  
+  qda.fit <- qda(x = sample_train[,-c(1,258,259)],grouping = sample_train$g)
+  
+  pred_qda.train <- predict(qda.fit, newdata=sample_train[,-c(1,258,259)])$class
+  pred_qda.test <- predict(qda.fit, newdata=sample_test[,-c(1,258,259)])$class
+  
+  qda_train_misclass[i] <- mean(ifelse(pred_qda.train == sample_train[,c(258)], yes=0, no=1))
+  qda_test_misclass[i] <- mean(ifelse(pred_qda.test == sample_test[,c(258)], yes=0, no=1))
+  if(qda_test_misclass[i]<minim){
+    minim = qda_test_misclass[i]
+  }
+  
+  ## LR uning glmnet
+  
+  library(glmnet)
+  glmnet.fit <- glmnet(x=as.matrix(sample_train[,-c(1,258,259)]), y=sample_train[,258], family="multinomial")
+
+  # Note that parameters are not the same as in multinom()
+  coef(glmnet.fit, s=0)
+
+  pred_glmnet.train <- predict(glmnet.fit, newx=as.matrix(sample_train[,-c(1,258,259)]), s=0, type="class")
+  pred_glmnet.test <- predict(glmnet.fit, newx=as.matrix(sample_test[,-c(1,258,259)]), s=0, type="class")
+  lr_train_misclass[i] <- mean(ifelse(pred_glmnet.train == sample_train$g, yes=0, no=1))
+  lr_test_misclass[i] <- mean(ifelse(pred_glmnet.test == sample_test$g, yes=0, no=1))
+  if(lr_test_misclass[i]<minim){
+    minim = lr_test_misclass[i]
+  }
+  
+  # "Optimal" LASSO Fit
+  lasso.fit <- cv.glmnet(x=as.matrix(sample_train[,-c(1,258,259)]), y=sample_train[,258], nfolds=5, family="multinomial")
+  
+  pred_lasso.min.train <- predict(lasso.fit, newx=as.matrix(sample_train[,-c(1,258,259)]), s=lasso.fit$lambda.min, type="class")
+  pred_lasso.min.test <- predict(lasso.fit, newx=as.matrix(sample_test[,-c(1,258,259)]), s=lasso.fit$lambda.min, type="class")
+  lo_train_misclass[i] <- mean(ifelse(pred_lasso.min.train == sample_train$g, yes=0, no=1))
+  lo_test_misclass[i] <- mean(ifelse(pred_lasso.min.test == sample_test$g, yes=0, no=1))
+  if(lo_test_misclass[i]<minim){
+    minim = lo_test_misclass[i]
+  }
+  
+  pred_lasso.1se.train <- predict(lasso.fit, newx=as.matrix(sample_train[,-c(1,258,259)]), s=lasso.fit$lambda.1se, type="class")
+  pred_lasso.1se.test <- predict(lasso.fit, newx=as.matrix(sample_test[,-c(1,258,259)]), s=lasso.fit$lambda.1se, type="class")
+  ls_train_misclass[i] <- mean(ifelse(pred_lasso.1se.train == sample_train$g, yes=0, no=1))
+  ls_test_misclass[i] <- mean(ifelse(pred_lasso.1se.test == sample_test$g, yes=0, no=1))
+  if(ls_test_misclass[i]<minim){
+    minim = ls_test_misclass[i]
+  }
+  
+  ## Convert all test errors into relative test errors
+  lda_test_misclass[i] = lda_test_misclass[i]/minim
+  qda_test_misclass[i] = qda_test_misclass[i]/minim
+  lr_test_misclass[i] = lr_test_misclass[i]/minim
+  lo_test_misclass[i] = lo_test_misclass[i]/minim
+  ls_test_misclass[i] = ls_test_misclass[i]/minim
+
+}
+```
+
+##Boxplots
+```{r}
+a = c(lda_train_misclass,qda_train_misclass,lr_train_misclass,lo_train_misclass,ls_train_misclass)
+b = c("LDA","LDA","LDA","LDA","QDA","QDA","QDA","QDA","LR","LR","LR","LR","LASSO Min","LASSO Min","LASSO Min","LASSO Min","LASSO 1SE","LASSO 1SE","LASSO 1SE","LASSO 1SE")
+c = data.frame(a,b)
+boxplot(a ~ . ,data=c,xlab = "Method", ylab = "Absolute Training Error")
+
+d = c(lda_test_misclass,qda_test_misclass,lr_test_misclass,lo_test_misclass,ls_test_misclass)
+e = c("LDA","LDA","LDA","LDA","QDA","QDA","QDA","QDA","LR","LR","LR","LR","LASSO min","LASSO min","LASSO min","LASSO min","LASSO 1se","LASSO 1se","LASSO 1se","LASSO 1se")
+f = data.frame(d,e)
+boxplot(d ~ . ,data=f,xlab = "Method", ylab = "Relative Testing Error")
+```
