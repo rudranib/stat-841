@@ -1,0 +1,69 @@
+---
+title: "841 Assignment 3 Q3"
+output: pdf_document
+---
+##Q2)
+
+##a)
+```{r}
+# Classification by SVM
+# wheat data
+
+wheatdata <- read.csv("/Users/rudranibhadra/Downloads/wheat.csv")
+
+wheatdata$type <- as.factor(wheatdata$type)
+
+#head(wheatdata)
+#dim(wheatdata)
+
+# Create 2 sets again: 
+
+set.seed(67982193)
+perm<-sample(x=nrow(wheatdata))
+set1<-wheatdata[which(perm<=200),-1]
+set2<-wheatdata[which(perm>200),-1]
+
+#Gaussian Radial
+library(e1071)
+wheat.tune.svm <- tune.svm(data=set1, type ~ ., kernel="radial", gamma=10^(-5:0), cost=10^(-3:3), cross=10)
+summary(wheat.tune.svm)
+head(wheat.tune.svm$decision.values)
+head(wheat.tune.svm$fitted)
+aa.radial <- summary(wheat.tune.svm)$performance # Individual fold performance
+aa.radial[order(aa.radial[,3]),]
+
+wheat.best.svm <- svm(data=set1, type ~ ., kernel="radial", gamma= 0.01, cost=100)
+summary(wheat.best.svm)
+
+pred2.1.1 <- predict(wheat.best.svm, newdata=set2, type = "vector")
+table(pred2.1.1, set2$type,  dnn=c("Predicted","Observed"))
+(misclass2.1.1 <- mean(ifelse(pred2.1.1 == set2$type, yes=0, no=1)))
+
+```
+Test error is 0.346.
+
+##b)
+
+```{r}
+# Classification by SVM
+# wheat data
+wheat.tune.poly <- tune.svm(data=set1, type ~ ., kernel="polynomial", gamma=10^(-5:0), cost=10^(-3:3), cross=5, degree = c(1:3) , coef0 = 10^(-1:1))
+summary(wheat.tune.poly)
+
+aa.polynomial <- summary(wheat.tune.poly)$performance # Individual fold performance
+aa.polynomial[order(aa.polynomial[,3]),]
+
+wheat.best.svm <- svm(data=set1, type ~ ., kernel="polynomial", gamma= 0.01, cost=100, degree = 2 , coef0 = 100)
+summary(wheat.best.svm)
+
+pred3.1.1 <- predict(wheat.best.svm, newdata=set2, type = "vector")
+table(pred3.1.1, set2$type,  dnn=c("Predicted","Observed"))
+(misclass3.1.1 <- mean(ifelse(pred3.1.1 == set2$type, yes=0, no=1)))
+
+
+```
+Test error is 0.33.
+
+
+##c) The test errors for SVM using Gaussian radial kernel(0.346) and polynomial kernel(0.33) are smaller than the test errors using single classification trees(0.426), random forests(0.453) and gradient boosting(0.466).
+

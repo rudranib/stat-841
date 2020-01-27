@@ -1,0 +1,207 @@
+---
+title: "841 Assignment 3 Q1"
+output: pdf_document
+---
+##Q1)
+
+##a)
+```{r warning=FALSE}
+# Classification Trees
+# wheat data
+
+wheat <- read.csv("/Users/rudranibhadra/Downloads/wheat.csv")
+
+# Create 3 sets again: 
+
+set.seed(67982193)
+perm<-sample(x=nrow(wheat))
+set1<-wheat[which(perm<=200),-1]
+set2<-wheat[which(perm>200),-1]
+
+library(rpart)
+wheat.tree <- rpart(data=set1, type ~ ., method="class", cp=0.001)
+print(wheat.tree, digits=3)
+printcp(wheat.tree)
+wheat.tree$cptable[,c(2:5,1)]
+
+library(rpart.plot)
+x11(h=10, w=10)
+prp(wheat.tree, type=1, extra=1, main="Original full tree")
+
+# Plot of the cross-validation for the complexity parameter.
+dev.new(h=7, w=10, pointsize=10)
+plotcp(wheat.tree)
+
+val.tune <- function(obj, valid, G, grid) {
+  cp <- matrix(0, ncol=2, nrow=grid)
+  for (x in c(1:grid)){
+    cp[x,1] <- x/grid  
+    pred <- predict(prune(obj, cp=x/grid), newdata=valid, type="class")
+    cp[x,2] <- mean(ifelse(pred == G, yes=0, no=1))
+  }
+  cp
+}
+wheat.valtree <- val.tune(obj=wheat.tree, valid=set1, G=set1$type, grid=1000)
+# Returns optimal cp and misclassification rate there.
+wheat.valtree[which.min(wheat.valtree[,2]), ]
+
+# Creating a pruned tree using a selected value of the CP by CV.
+wheat.prune.cv.1se <- prune(wheat.tree, cp=0.1)
+# Creating a pruned tree using a selected value of the CP by CV.
+wheat.prune.cv.min <- prune(wheat.tree, cp=0.041)
+# Creating a pruned tree using a selected value of the CP by validation.
+wheat.prune.val <- prune(wheat.tree, cp=0.007)
+
+x11(h=10, w=18)
+par(mfrow=c(1,3))
+prp(wheat.prune.cv.1se, type=1, extra=1, main="Pruned CV-1SE tree")
+prp(wheat.prune.cv.min, type=1, extra=1, main="Pruned CV-min tree")
+prp(wheat.tree, type=1, extra=1, main="Original full tree")
+
+pred.test.cv.1se <- predict(wheat.prune.cv.1se, newdata=set2, type="class")
+pred.test.cv.min <- predict(wheat.prune.cv.min, newdata=set2, type="class")
+pred.test.full <- predict(wheat.tree, newdata=set2, type="class")
+
+#Misclassification Errors
+(misclass.test.cv.1se <- mean(ifelse(pred.test.cv.1se == set2$type, yes=0, no=1)))
+(misclass.test.cv.min <- mean(ifelse(pred.test.cv.min == set2$type, yes=0, no=1)))
+(misclass.test.full <- mean(ifelse(pred.test.full == set2$type, yes=0, no=1)))
+
+# Confusion Matrices
+table(pred.test.cv.1se, set2$type,  dnn=c("Predicted","Observed"))
+table(pred.test.cv.min, set2$type,  dnn=c("Predicted","Observed"))
+table(pred.test.full, set2$type,  dnn=c("Predicted","Observed"))
+```
+
+##b)
+
+```{r warning=FALSE}
+
+# Random Forests for Classification
+# Vehicle image data
+
+wheatdata <- read.csv("/Users/rudranibhadra/Downloads/wheat.csv")
+
+wheatdata$class <- as.factor(wheatdata$class)
+
+
+# Create 2 sets again: 
+
+set.seed(67982193)
+perm<-sample(x=nrow(wheatdata))
+set1<-wheatdata[which(perm<=200),-1]
+set2<-wheatdata[which(perm>200),-1]
+
+library(randomForest)
+# Starting with mtry=1 variable
+wheat.rf.1 <- randomForest(data=set1, type~., 
+                         importance=TRUE, ntree=1000, mtry=1, keep.forest=TRUE)
+wheat.rf.1             
+
+##Rerun with 1200 
+dev.new(h=7,w=6,pointsize=12)
+plot(wheat.rf.1)
+
+wheat.rf.1 <- randomForest(data=set1, type~., 
+                         importance=TRUE, ntree=1200, mtry=1, keep.forest=TRUE)
+wheat.rf.1 
+wheat.rf.2 <- randomForest(data=set1, type~., 
+                           importance=TRUE, ntree=1200, mtry=2, keep.forest=TRUE)
+wheat.rf.2 
+wheat.rf.3 <- randomForest(data=set1, type~., 
+                           importance=TRUE, ntree=1200, mtry=3, keep.forest=TRUE)
+wheat.rf.3 
+wheat.rf.4 <- randomForest(data=set1, type~., 
+                           importance=TRUE, ntree=1200, mtry=4, keep.forest=TRUE)
+wheat.rf.4 
+wheat.rf.5 <- randomForest(data=set1, type~., 
+                           importance=TRUE, ntree=1200, mtry=5, keep.forest=TRUE)
+wheat.rf.5 
+wheat.rf.6 <- randomForest(data=set1, type~., 
+                           importance=TRUE, ntree=1200, mtry=6, keep.forest=TRUE)
+wheat.rf.6
+
+dev.new(h=7,w=6,pointsize=12)
+plot(wheat.rf.3)
+
+round(importance(wheat.rf.3),3) # Print out importance measures
+dev.new(h=7,w=15)
+varImpPlot(wheat.rf.3) # Plot of importance measures
+#Q1.b Interpret the importance of the variables 
+# Density and weight are the important variables. Density and weight gives the maximum value for MeanDecreaseAccuracy and MeanDecreaseGini, followed by variable moisture.
+# Predict results of classification. 
+pred.rf.1.train <- predict(wheat.rf.3, newdata=set1, type="response")
+pred.rf.1.test <- predict(wheat.rf.3, newdata=set2, type="response")
+
+(misclass.train.rf1 <- mean(ifelse(pred.rf.1.train == set1$type, yes=0, no=1)))
+(misclass.test.rf1 <- mean(ifelse(pred.rf.1.test == set2$type, yes=0, no=1)))
+
+wheat.rf.4 <- randomForest(data=set1, type~., 
+                         importance=TRUE, ntree=2500, keep.forest=TRUE)
+wheat.rf.4             # more useful here
+# Default plot method shows OOB error vs. number of trees.
+dev.new(h=7,w=6,pointsize=12)
+plot(wheat.rf.4)
+
+round(importance(wheat.rf.4),3) # Print out important measures
+dev.new(h=7,w=12)
+varImpPlot(wheat.rf.4) 
+
+pred.rf.4.train <- predict(wheat.rf.4, newdata=set1, type="response")
+pred.rf.4.test <- predict(wheat.rf.4, newdata=set2, type="response")
+
+(misclass.train.4 <- mean(ifelse(pred.rf.4.train == set1$type, yes=0, no=1)))
+(misclass.test.4 <- mean(ifelse(pred.rf.4.test == set2$type, yes=0, no=1)))
+
+# Tables of classification results
+table(pred.rf.4.test, set2$type,  dnn=c("Predicted","Observed"))
+
+dev.new(h=7,w=6,pointsize=12)
+hist(treesize(wheat.rf.4))
+
+# CONTROLLING THE MAXIMUM NUMBER OF NODES, RATHER THAN THE NODESIZE.
+wheat.rf.4.80 <- randomForest(data=set1, type~., maxnodes=80,
+                            importance=TRUE, ntree=2500, keep.forest=TRUE)
+wheat.rf.4.60 <- randomForest(data=set1, type~., maxnodes=60,
+                            importance=TRUE, ntree=2500, keep.forest=TRUE)
+wheat.rf.4.40 <- randomForest(data=set1, type~., maxnodes=40,
+                            importance=TRUE, ntree=2500, keep.forest=TRUE)
+wheat.rf.4.20 <- randomForest(data=set1, type~., maxnodes=20,
+                            importance=TRUE, ntree=2500, keep.forest=TRUE)
+wheat.rf.4.10 <- randomForest(data=set1, type~., maxnodes=10,
+                            importance=TRUE, ntree=2500, keep.forest=TRUE)
+wheat.rf.4.5 <- randomForest(data=set1, type~., maxnodes=5,
+                           importance=TRUE, ntree=2500, keep.forest=TRUE)
+wheat.rf.4.60
+wheat.rf.4.40
+wheat.rf.4.20
+wheat.rf.4.10
+wheat.rf.4.5
+
+
+```
+
+Optimal number of variables is 3. Density and weight are the important variables.
+Test error is 0.453.
+## c)
+
+```{r warning=FALSE}
+pred.rf.60.val <- predict(wheat.rf.4.60, newdata=set2, type="response")
+(misclass.val.60 <- mean(ifelse(pred.rf.60.val == set2$type, yes=0, no=1)))
+
+pred.rf.40.val <- predict(wheat.rf.4.40, newdata=set2, type="response")
+(misclass.val.40 <- mean(ifelse(pred.rf.40.val == set2$type, yes=0, no=1)))
+
+pred.rf.20.val <- predict(wheat.rf.4.20, newdata=set2, type="response")
+(misclass.val.20 <- mean(ifelse(pred.rf.20.val == set2$type, yes=0, no=1)))
+
+pred.rf.10.val <- predict(wheat.rf.4.10, newdata=set2, type="response")
+(misclass.val.10 <- mean(ifelse(pred.rf.10.val == set2$type, yes=0, no=1)))
+
+pred.rf.5.val <- predict(wheat.rf.4.5, newdata=set2, type="response")
+(misclass.val.5 <- mean(ifelse(pred.rf.5.val == set2$type, yes=0, no=1)))
+
+```
+Max nodes=60.
+Test error increases with smaller trees.
+Validation error varies each time.

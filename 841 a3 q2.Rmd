@@ -1,0 +1,60 @@
+---
+title: "841 Assignment 3 Q2"
+output: pdf_document
+---
+
+##a)
+```{r warning=FALSE}
+wheatdata <- read.csv("/Users/rudranibhadra/Downloads/wheat.csv")
+
+wheatdata$class <- as.factor(wheatdata$class)
+
+
+# Create 2 sets again: 
+
+set.seed(67982193)
+perm<-sample(x=nrow(wheatdata))
+set1<-wheatdata[which(perm<=200),-1]
+set2<-wheatdata[which(perm>200),-1]
+
+
+library(caret)
+library(gbm)
+
+caretGrid <- expand.grid(interaction.depth=c(1, 3, 5), n.trees = (0:50)*50,
+                         shrinkage=seq(0.001,.01,0.001),
+                         n.minobsinnode=seq(6,18,2))
+
+metric <- "Accuracy"
+trainControl <- trainControl(method="cv", number=10)
+
+set.seed(99)
+gbm.caret <- train(type ~ ., data=set1, distribution="multinomial", method="gbm",
+                   trControl=trainControl, verbose=FALSE, 
+                   tuneGrid=caretGrid, metric=metric, bag.fraction=0.75) 
+
+gbm.caret$bestTune
+
+gbm.tuned <- gbm(data=set1, type~., 
+                 distribution="multinomial", verbose=FALSE, 
+                 n.trees=1000, interaction.depth=5, shrinkage=0.008, 
+                 bag.fraction=0.75, n.minobsinnode=6)
+
+ntrees <- gbm.perf(gbm.tuned)
+varImp(object=gbm.caret)
+summary(gbm.tuned)
+pred.mul.test <- predict(gbm.tuned, newdata=set2, n.trees=1000, type="response")
+test.pred.class <- apply(pred.mul.test[,,1], 1, which.max)
+(test.error <- mean(ifelse(test.pred.class == as.numeric(set2$type), yes=0, no=1)))
+
+
+```
+Cross validation is computed with the help of the methods trainControl and train.
+
+## b)
+The most important variable is density followed by weight.
+
+## c)
+
+The test error is 0.466. Compared to classification tree and random forest, the test error is higher.
+
