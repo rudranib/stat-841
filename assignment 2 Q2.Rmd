@@ -1,0 +1,154 @@
+---
+title: "Assignment 2 Q2"
+author: "Rudrani Bhadra"
+output: pdf_document
+
+---
+#QUESTION 1
+
+```{r warning=FALSE}
+
+set.seed(46685326)
+set1 <- read.csv("/Users/rudranibhadra/Downloads/phoneme.csv",header=TRUE)
+set1<-set1[,-1]
+
+a1<-c()
+a2<-c()
+a3<-c()
+a4<-c()
+
+b1<-c()
+b2<-c()
+b3<-c()
+b4<-c()
+
+for(i in 1:4){
+   
+sample_ids.train = sample(1:4509,4509,replace=TRUE)
+sample.train = set1[sample_ids.train,]
+sample.test = set1[-sample_ids.train,]
+
+#length<-dim(set1)[1]
+#perm<-sample(x=nrow(set1),replace=T)
+#sample_ids.train<-unique(perm)
+#training<-set1[perm,]
+#test<-set1[-sample_ids.train]
+#l<-list(training,test)
+#sample.train<-l[[1]]
+#sample.test<-l[[2]]
+
+
+library(e1071)
+sample.train$g = as.factor(sample.train$g)
+#sample.train$speaker = as.factor(sample.train$speaker)
+nb.0 <- naiveBayes(x=sample.train[,-c(257,258)], y=sample.train[,c(257)])
+#nb.0 <- naiveBayes(as.factor(sample.train[,c(257,258)])~., data=sample.train[,-c(257,258)])
+
+nb.pred.test <- predict(nb.0, newdata=sample.test[,-c(257,258)],type='class')
+
+# Calculate in-sample and out-of-sample misclassification error
+nb.pred.train <- predict(nb.0, newdata=sample.train[,-c(257,258)],type="class")
+p<-predict(nb.0, sample.train[,-c(257,258)])
+#table(p,sample.train[,c(257)])
+      
+(nbmisclass.train <- mean(ifelse(nb.pred.train == sample.train$g, yes=0, no=1)))
+a1[i]<-nbmisclass.train
+(nbmisclass.test <- mean(ifelse(nb.pred.test == sample.test$g, yes=0, no=1)))
+b1[i]<- nbmisclass.test   
+######################################################
+## klaR::NaiveBayes is an experimental function that uses the 
+##   e1071::naiveBayes() function, but does Gaussian Kernel Smothing
+## ********predict() Gives error messages, but seems to work
+######################################################
+      
+library(klaR)
+NB <- NaiveBayes(x=sample.train[,-c(257,259)], grouping=sample.train[,c(257)], usekernel=TRUE)
+      
+#win.graph(h=7,w=6)
+#plot(NB, lwd=2)
+      
+
+NB.pred.train <- predict(NB, newdata=sample.train[,-c(257,258)], type="class")
+#table(NB.pred.train$class, sample.train[,c(257)], dnn=c("Predicted","Observed"))
+      
+NB.pred.test <- predict(NB, newdata=sample.test[,-c(257,258)], type="class")
+#table(NB.pred.test$class, sample.test[,c(257)], dnn=c("Predicted","Observed"))
+#warnings()
+#round(NB.pred.test$posterior)
+      
+# Error rates
+(NBmisclass.train <- mean(ifelse(NB.pred.train$class == sample.train$g, yes=0, no=1)))
+a2[i]<-NBmisclass.train
+(NBmisclass.test <- mean(ifelse(NB.pred.test$class == sample.test$g, yes=0, no=1)))
+b2[i]<-NBmisclass.test      
+      
+####################################################################
+# Run PCA before Naive Bayes to decorrelate data
+#   This is something that has been proposed in the literature
+#   See Liwei Fan, Kim Leng Poh, 2007, A Comparative Study of PCA, ICA 
+#   and Class-Conditional ICA for Na?ve Bayes Classifier.
+      
+# Logic: Rotate the axes with respect to optimizing variance allocation 
+#   in the training set, then rotate the other sets' axes
+#   using the same transformation so that they are all aligned.
+pc <-  prcomp(x=sample.train[,-c(257,258)], scale.=TRUE)
+      
+# Create the same transformations in all three data sets 
+#   and attach the response variable at the end
+#   predict() does this 
+xi.1 <- data.frame(pc$x,class = as.factor(sample.train$g))
+xi.2 <- data.frame(predict(pc, newdata=sample.test), class = as.factor(sample.test$g))
+      
+NB.pc <- NaiveBayes(x=xi.1[,-c(257,258)], grouping=xi.1[,c(257)], usekernel=FALSE)
+      
+#dev.new(h=7,w=6)
+#plot(NB.pc, lwd=2)
+      
+NBpc.pred.train <- predict(NB.pc, newdata=xi.1[,-c(257,258)], type="class")
+#table(NBpc.pred.train$class, xi.1[,c(257)], dnn=c("Predicted","Observed"))
+      
+NBpc.pred.test <- predict(NB.pc, newdata=xi.2[,-c(257,258)], type="class")
+#table(NBpc.pred.test$class, xi.2[,c(257)], dnn=c("Predicted","Observed"))
+#warnings()
+      
+# Error rates
+(NBPCmisclass.train <- mean(ifelse(NBpc.pred.train$class == xi.1$class, yes=0, no=1)))
+a3[i]<-NBPCmisclass.train
+(NBPCmisclass.test <- mean(ifelse(NBpc.pred.test$class == xi.2$class, yes=0, no=1)))
+b3[i]<-NBPCmisclass.test
+NB1.pc <- NaiveBayes(x=xi.1[,-c(257,258)], grouping=xi.1[,c(257)], usekernel=TRUE)
+
+#dev.new(h=7,w=6)
+#plot(NB1.pc, lwd=2)
+
+NB1pc.pred.train <- predict(NB1.pc, newdata=xi.1[,-c(257,258)], type="class")
+#table(NB1pc.pred.train$class, xi.1[,c(257)], dnn=c("Predicted","Observed"))
+
+NB1pc.pred.test <- predict(NB1.pc, newdata=xi.2[,-c(257,258)], type="class")
+#table(NB1pc.pred.test$class, xi.2[,c(257)], dnn=c("Predicted","Observed"))
+#warnings()
+
+# Error rates
+(NBPC1misclass.train <- mean(ifelse(NB1pc.pred.train$class == xi.1$class, yes=0, no=1)))
+a4[i]<-NBPC1misclass.train
+(NBPC1misclass.test <- mean(ifelse(NB1pc.pred.test$class == xi.2$class, yes=0, no=1)))
+b4[i]<-NBPC1misclass.test
+
+
+}
+
+a = c(a1,a2,a3,a4)
+b = c("NBG","NBG","NBG","NBG","NBK","NBK","NBK","NBK","NBG_PCA","NBG_PCA","NBG_PCA","NBG_PCA","NBK_PCA","NBK_PCA","NBK_PCA","NBK_PCA")
+
+c = data.frame(a,b)
+boxplot(a ~ . ,data=c,xlab = "Method", ylab = "Absolute Training Error")
+
+d = c(b1,b2,b3,b4)
+e = c("NBG","NBG","NBG","NBG","NBK","NBK","NBK","NBK","NBG_PCA","NBG_PCA","NBG_PCA","NBG_PCA","NBK_PCA","NBK_PCA","NBK_PCA","NBK_PCA")
+
+f = data.frame(d,e)
+boxplot(d ~ . ,data=f,xlab = "Method", ylab = "Absolute Testing Error")
+
+```
+From the plots, the training error is smaller than the testing error. Naive Bayes using Gaussian and Kernel have good performances on both the training and test sets. The training error is lower and the testing error is higher when using PCA in both cases Gaussian and Kernel. This means that overfitting of data is taking place when using Naive Bayes (Gaussian and Kernel) with PCA rotation. 
+

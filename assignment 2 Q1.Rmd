@@ -1,0 +1,339 @@
+---
+title: "Assignment 2 Q1"
+output: pdf_document
+---
+#QUESTION 1
+
+##a)
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+wheat<-read.csv("/Users/rudranibhadra/Downloads/wheat.csv")
+set.seed(46685326)
+perm<-sample(x=nrow(wheat))
+set1<-wheat[which(perm<=200),-1]
+set2<-wheat[which(perm>200),-1]
+
+set1$type <- as.character(set1$type)
+set1$type <- ifelse(set1$type == "Scab", "Not Healthy", set1$type)
+set1$type <- ifelse(set1$type == "Sprout", "Not Healthy", set1$type)
+
+set2$type <- as.character(set2$type)
+set2$type <- ifelse(set2$type == "Scab", "Not Healthy", set2$type)
+set2$type <- ifelse(set2$type == "Sprout", "Not Healthy", set2$type)
+
+#set1$type<-ifelse(set1$type=="Healthy", y=1, n=0)
+#set2$type<-ifelse(set2$type=="Healthy", y=1, n=0)
+```
+
+## i)
+
+```{r}
+
+pair1 <- ifelse(set1$type=="Healthy", y=1, n=0)
+pair2 <- ifelse(set2$type=="Healthy", y=1, n=0)
+
+rescale <- function(x1,x2){
+  for(col in 1:ncol(x1)){
+    a <- min(x2[,col])
+    b <- max(x2[,col])
+    x1[,col] <- (x1[,col]-a)/(b-a)
+  }
+  x1
+}
+
+set1.rescale <- data.frame(cbind(rescale(set1[,-c(1,7)], set1[,-c(1,7)]),type = pair1))
+set2.rescale <- data.frame(cbind(rescale(set2[,-c(1,7)], set1[,-c(1,7)]), type = pair2))
+
+
+library(nnet)
+
+#mod.fit <- multinom(data=set1.rescale, formula= type~density, trace=TRUE)
+mod.fit <- multinom(data=set1.rescale, formula=type ~ density, maxit=1000, trace=TRUE)
+#mod.fit <- multinom(data=set1.rescale, formula=type ~ density, maxit=5000, trace=TRUE)
+mod.fit
+summary(mod.fit)
+
+pv<-predict(mod.fit, newdata=set1.rescale, type="probs")
+plot(set1$density,pv,xlab="density",ylab="predicted values")
+
+
+pred.class.1 <- predict(mod.fit, newdata=set1.rescale)
+
+pred.class.2 <- predict(mod.fit, newdata=set2.rescale)
+
+(mul.misclass.train <- mean(ifelse(pred.class.1 == set1.rescale$type, yes=0, no=1)))
+(mul.misclass.test <- mean(ifelse(pred.class.2 == set2.rescale$type, yes=0, no=1)))
+```
+Equation for estimated probability for healthy:
+
+$$log\frac{p(Not Healthy)}{p(Healthy)} = -11.14-19.53*density$$
+The plot shows that the probablity of being healthy increases as the density increases. When the density approaches 1.6, the slope of the line isnt steep which means that the probablity increases slowly as density increases. The line is steeper in the middle portion of density data, which indicates that a unit change in density has a larger effect in this range. When the probability of healthy approaches zero at the low end of the density range, the line flattens again.
+
+## ii)
+
+```{r}
+library(sm)
+  
+#pair1 <- ifelse(set1$type=="Healthy", y=1, n=0)
+#pair2 <- ifelse(set2$type=="Healthy", y=1, n=0)
+
+#dev.new(h=12,w=12,pointsize=12)
+#par(mfrow=c(3,2))
+#test_e<-c()
+#hh=seq(0.05,1,length=40)
+#for(i in 1:40){
+#s<-sm.binomial(x=set1[,2], y=pair1, h=hh[i],eval.points=set2[,2])
+#pv<-ifelse(s$estimate >= 0.5, yes=1, no=0)
+#test_e[i]<-mean(ifelse(pv == pair2, yes=0, no=1))
+#print(test_e)
+#f(test_m>test_e){
+ #test_m<-test_e
+ #H<-hh[i]
+ #print(H)
+#}
+#}
+#print(test_e)
+#h=hh[i]
+#print(h)
+
+# Checking the linear predictor: How non-linear is it?
+#dev.new(h=7,w=6)
+a1 <- sm.binomial(x=set1[,2], y=pair1,eval.points=set1[,2], h=0.13)
+a2 <- sm.binomial(x=set1[,2], y=pair1,eval.points=set2[,2], h=0.13)
+#plot(y=a1$estimate,x=a1$eval.points)
+#plot(y=a$estimate, x=a$eval.points)
+#a3<-ifelse(a1$estimate >= 0.5, yes=1, no=0)
+a4<-ifelse(a2$estimate >= 0.5, yes=1, no=0)
+#(misclassm.train <- mean(ifelse(a3 == pair1, yes=0, no=1)))
+#(misclassm.test <- mean(ifelse(a4 == pair2, yes=0, no=1)))
+#pv<-predict(a$eval.points, newdata=set1, type="response")
+#pv<-predict(a$estimates,newdata=set1)
+#predict()
+#plot(pv,set1$density)
+#plot(set1[,2],a1$estimate)
+plot(a2$eval.points,a2$estimate,xlab="density",ylab="predicted values")
+```
+I have chosen h to be 0.13 since it has small misclassification error and it converges. An h value smaller than 0.13 is leading to overfitting of the data. 
+
+The plot is similar to the previos plot. It shows that the probablity of being healthy increases as the density increases. When the density approaches 1.4, the slope of the line isnt steep which means that the probablity increases slowly as density increases. The line is steeper in the middle portion of density data, which indicates that a unit change in density has a larger effect in this range. When the probability of healthy approaches zero at the low end of the density range, the line flattens again.
+
+## iii)
+The plots of both i) and ii) are similar. The linear log-odds seem reasonable in both plots.
+
+## iv)
+```{r}
+a1 <- sm.binomial(x=set1[,2], y=pair1, h=0.13)
+plot(y=a1$linear.predictor, x=a1$eval.points)
+```
+The graph seems to be fairly linear.
+## v)
+```{r}
+#dev.new(h=7,w=6)
+a1 <- sm.binomial(x=set1[,2], y=pair1,eval.points=set1[,2], h=0.13)
+a2 <- sm.binomial(x=set1[,2], y=pair1,eval.points=set2[,2], h=0.13)
+#plot(y=a1$estimate,x=a1$eval.points)
+#plot(y=a$estimate, x=a$eval.points)
+a3<-ifelse(a1$estimate >= 0.5, yes=1, no=0)
+a4<-ifelse(a2$estimate >= 0.5, yes=1, no=0)
+(misclassm.train <- mean(ifelse(a3 == pair1, yes=0, no=1)))
+(misclassm.test <- mean(ifelse(a4 == pair2, yes=0, no=1)))
+
+pred.class.1 <- predict(mod.fit, newdata=set1.rescale)
+
+pred.class.2 <- predict(mod.fit, newdata=set2.rescale)
+
+(mul.misclass.train <- mean(ifelse(pred.class.1 == set1.rescale$type, yes=0, no=1)))
+(mul.misclass.test <- mean(ifelse(pred.class.2 == set2.rescale$type, yes=0, no=1)))
+
+
+```
+The training errors for both fits are the same. The test error is slightly higher for smooth binomial regression model than the logistic regression model.
+
+## vi)
+```{r}
+library(mgcv)
+
+#  Generalized additive model as alternative to multivariate splines
+
+gam4 <- gam(data=set1, pair1~class+s(density) + s(hardness) + 
+              s(size) + s(weight) + s(moisture), 
+            family=binomial(link=logit)) 
+summary(gam4)
+plot(gam4)
+```
+The significant variables are density and moisture. A model with just these two models are sufficient.
+
+## vii)
+The plots for density and moisture suggest nonlinearity in the log-odds. The non-linearity in majority of the plots suggest that the log oddsinvolving all variables is likely to be non linear.
+
+
+## viii)
+```{r}
+pred.prob4.1 <- predict(gam4, newdata=set1[,1:6], type="response")
+pred.class4.1 <- as.numeric(predict(gam4, newdata=set1[,1:6], type="link") > 0)
+#head(cbind(round(pred.prob4.1, digits=3), pred.class4.1))
+
+pred.prob4.2 <- predict(gam4, newdata=set2[,1:6], type="response")
+pred.class4.2 <- as.numeric(predict(gam4, newdata=set2[,1:6], type="link") > 0)
+
+
+# Error rates not comparable to full multinomial problem
+(misclass4.train <- mean(ifelse(pred.class4.1 == pair1, yes=0, no=1)))
+(misclass4.test <- mean(ifelse(pred.class4.2 == pair2, yes=0, no=1)))
+```
+The training error is lower than the first two methods but the testing error is higher. So slight overfitting of data has taken place. 
+
+So adding more variables does not help.
+
+# b)
+```{r}
+wheat<-read.csv("/Users/rudranibhadra/Downloads/wheat.csv")
+set.seed(46685326)
+perm<-sample(x=nrow(wheat))
+set1<-wheat[which(perm<=200),-1]
+set2<-wheat[which(perm>200),-1]
+
+library(sm)
+#set1$type<-as.numeric(set1$type)
+set1$class<-as.numeric(set1$class)
+library(car)
+
+library(nnet)
+
+
+#density
+kd1.11 <- density(set1[which(set1$type=="Healthy"),2], kernel="gaussian")
+kd1.12 <- density(set1[which(set1$type=="Scab"),2], kernel="gaussian")
+kd1.13 <- density(set1[which(set1$type=="Sprout"),2], kernel="gaussian")
+#hardness
+kd1.21 <- density(set1[which(set1$type=="Healthy"),3], kernel="gaussian")
+kd1.22 <- density(set1[which(set1$type=="Scab"),3], kernel="gaussian")
+kd1.23 <- density(set1[which(set1$type=="Sprout"),3], kernel="gaussian")
+#size
+kd1.31 <- density(set1[which(set1$type=="Healthy"),4], kernel="gaussian")
+kd1.32 <- density(set1[which(set1$type=="Scab"),4], kernel="gaussian")
+kd1.33 <- density(set1[which(set1$type=="Sprout"),4], kernel="gaussian")
+#weight
+kd1.41 <- density(set1[which(set1$type=="Healthy"),5], kernel="gaussian")
+kd1.42 <- density(set1[which(set1$type=="Scab"),5], kernel="gaussian")
+kd1.43 <- density(set1[which(set1$type=="Sprout"),5], kernel="gaussian")
+#moisture
+kd1.51 <- density(set1[which(set1$type=="Healthy"),6], kernel="gaussian")
+kd1.52 <- density(set1[which(set1$type=="Scab"),6], kernel="gaussian")
+kd1.53 <- density(set1[which(set1$type=="Sprout"),6], kernel="gaussian")
+#class
+kd1.61 <- density(set1[which(set1$type=="Healthy"),1], kernel="gaussian")
+kd1.62 <- density(set1[which(set1$type=="Scab"),1], kernel="gaussian")
+kd1.63 <- density(set1[which(set1$type=="Sprout"),1], kernel="gaussian")
+
+sm.density.compare(x=set1[,1], group=set1$type, lwd=1, xlab="classnum")
+sm.density.compare(x=set1[,2], group=set1$type, lwd=2, xlab="density")
+sm.density.compare(x=set1[,3], group=set1$type, lwd=2, xlab="hardness")
+sm.density.compare(x=set1[,4], group=set1$type, lwd=2, xlab="size")
+sm.density.compare(x=set1[,5], group=set1$type, lwd=2, xlab="weight")
+sm.density.compare(x=set1[,6], group=set1$type, lwd=2, xlab="moisture")
+```
+
+## i)
+Except for classnum and moisture, the rest are approximately normally distributed.
+
+## ii)
+Based on the plots, density and weight seem important since the means of the three classes are seperate and distinct. Yes, it matches with the results from the tests from logistic regression in the last assignment 
+
+# c)
+```{r}
+wheat<-read.csv("/Users/rudranibhadra/Downloads/wheat.csv")
+set.seed(46685326)
+perm<-sample(x=nrow(wheat))
+set1<-wheat[which(perm<=200),-1]
+set2<-wheat[which(perm>200),-1]
+
+library(e1071)
+###############################################################
+## Naive Bayes is done in e1071::naiveBayes(). Unfortunately, 
+##  the default is simply to assume a Normal density in each margin
+##    (i.e. assume multivariate normality with no correlations).
+##  This makes it a cheap version of LDA.
+###############################################################
+
+set1$class = as.factor(set1$class)
+nb.0 <- naiveBayes(x=set1[,-7], y=set1[,7])
+
+
+# Calculate in-sample and out-of-sample misclassification error
+nb.pred.train <- predict(nb.0, newdata=set1[,-7], type="class")
+p<-predict(nb.0, set1[,-7])
+table(p, set1[,7],dnn=c("Predicted","Observed"))
+
+nb.pred.test <- predict(nb.0, newdata=set2[,-7], type="class")
+p<-predict(nb.0, set2[,-7])
+table(p, set2[,7],dnn=c("Predicted","Observed"))
+(nbmisclass.train <- mean(ifelse(nb.pred.train == set1$type, yes=0, no=1)))
+(nbmisclass.test <- mean(ifelse(nb.pred.test == set2$type, yes=0, no=1)))
+
+######################################################
+## klaR::NaiveBayes is an experimental function that uses the 
+##   e1071::naiveBayes() function, but does Gaussian Kernel Smothing
+## ********predict() Gives error messages, but seems to work
+######################################################
+
+library(klaR)
+NB <- NaiveBayes(x=set1[,-7], grouping=set1[,7], usekernel=TRUE)
+
+#dev.new(h=7,w=6)
+#plot(NB, lwd=2)
+
+NB.pred.train <- predict(NB, newdata=set1[,-7], type="class")
+table(NB.pred.train$class, set1[,7], dnn=c("Predicted","Observed"))
+
+NB.pred.test <- predict(NB, newdata=set2[,-7], type="class")
+table(NB.pred.test$class, set2[,7], dnn=c("Predicted","Observed"))
+
+# Error rates
+(NBmisclass.train <- mean(ifelse(NB.pred.train$class == set1$type, yes=0, no=1)))
+(NBmisclass.test <- mean(ifelse(NB.pred.test$class == set2$type, yes=0, no=1)))
+
+```
+Naive Bayes classifier using Gaussian:
+The training error is lower than LDA (0.3), higher than QDA (0.255) and Logistic regression (0.285).
+The test error is higher than LDA (0.2933), QDA (0.2533) and Logistic regression (0.28).
+
+Naive Bayes classifier using Gaussian Kernel:
+The training error is lower than LDA (0.3), QDA (0.255) and Logistic regression (0.285).
+The test error is higher than LDA (0.2933), QDA (0.2533) and Logistic regression (0.28).
+Overfitting of data takes place.
+
+## i)
+```{r warning=FALSE}
+set1$class<-as.numeric(set1$class)
+set2$class<-as.numeric(set2$class)
+pc <-  prcomp(x=set1[,-7], scale.=TRUE)
+
+
+# Create the same transformations in all three data sets 
+#   and attach the response variable at the end
+#   predict() does this 
+xi.1 <- data.frame(pc$x,class = as.factor(set1$type))
+xi.2 <- data.frame(predict(pc, newdata=set2), class = as.factor(set2$type))
+
+NB.pc <- NaiveBayes(x=xi.1[,-7], grouping=xi.1[,7], usekernel=TRUE)
+
+#dev.new(h=7,w=6)
+#plot(NB.pc, lwd=2)
+
+NBpc.pred.train <- predict(NB.pc, newdata=xi.1[,-7], type="class")
+table(NBpc.pred.train$class, xi.1[,7], dnn=c("Predicted","Observed"))
+
+NBpc.pred.test <- predict(NB.pc, newdata=xi.2[,-7], type="class")
+table(NBpc.pred.test$class, xi.2[,7], dnn=c("Predicted","Observed"))
+
+# Error rates
+(NBPCmisclass.train <- mean(ifelse(NBpc.pred.train$class == xi.1$class, yes=0, no=1)))
+(NBPCmisclass.test <- mean(ifelse(NBpc.pred.test$class == xi.2$class, yes=0, no=1)))
+```
+Naive Bayes classifier using Kernel based PCA:
+The training error is lower than LDA (0.3), QDA (0.255) and Logistic regression (0.285).
+The test error is higher than LDA (0.2933), QDA (0.2533) and Logistic regression (0.28).
+Overfitting of data takes place.
+
+Yes, the rotation improves the classifier since the test error is lower than the test error of naive Bayes using Kernel (0.466) although the training error is slightly increased.
